@@ -81,14 +81,9 @@ endif()
 
 
 if (${SVULKAN2_CUDA_INTEROP})
-    find_package(CUDA REQUIRED)
+    find_package(CUDAToolkit REQUIRED)
     target_compile_definitions(svulkan2 PUBLIC SVULKAN2_CUDA_INTEROP)
-    target_include_directories(svulkan2 PRIVATE "$ENV{CUDA_PATH}/include")
-    if (MSVC)
-        target_link_libraries(svulkan2 PRIVATE "$ENV{CUDA_PATH}/lib/x64/cudart_static.lib")
-    else()
-        target_link_libraries(svulkan2 PRIVATE "$ENV{CUDA_PATH}/lib64/libcudart_static.a" rt)
-    endif()
+    target_link_libraries(svulkan2 PRIVATE CUDA::cudart_static)
 
     include(oidn)
     target_link_libraries(svulkan2 PRIVATE OpenImageDenoise)
