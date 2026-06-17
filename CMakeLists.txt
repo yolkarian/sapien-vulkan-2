@@ -86,6 +86,8 @@ if (${SVULKAN2_CUDA_INTEROP})
     target_link_libraries(svulkan2 PRIVATE CUDA::cudart_static)
 
     include(oidn)
+    add_dependencies(svulkan2 OpenImageDenoise_device_cuda)
+    ExternalProject_Get_property(OpenImageDenoise_device_cuda binary_dir)
     target_link_libraries(svulkan2 PRIVATE OpenImageDenoise)
 endif()
 
@@ -96,6 +98,8 @@ target_compile_definitions(svulkan2 PRIVATE VULKAN_HPP_STORAGE_SHARED_EXPORT)
 target_compile_definitions(svulkan2 PUBLIC VULKAN_HPP_STORAGE_SHARED)
 
 if (${SVULKAN2_CUDA_INTEROP})
+    install(DIRECTORY ${binary_dir}/../preinstall/lib DESTINATION "." OPTIONAL)
+    install(DIRECTORY ${binary_dir}/../preinstall/lib64 DESTINATION "." OPTIONAL)
     install(TARGETS svulkan2 Vulkan-Headers glm OpenImageDenoise OpenImageDenoise_core OpenImageDenoise_common
         EXPORT svulkan2Targets
         LIBRARY DESTINATION lib
