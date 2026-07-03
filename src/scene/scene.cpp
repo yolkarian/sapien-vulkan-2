@@ -2,9 +2,63 @@
 #include "../common/logger.h"
 #include "svulkan2/core/context.h"
 #include <algorithm>
+#include <mutex>
+#include <unordered_map>
 
 namespace svulkan2 {
 namespace scene {
+
+namespace {
+std::mutex gSceneDependenciesMutex;
+std::unordered_map<Scene *, std::vector<Scene *>> gSceneDependencies;
+} // namespace
+
+namespace detail {
+void registerSceneDependency(Scene *source, Scene *dependent) {
+  if (!source || !dependent) {
+    return;
+  }
+
+  std::lock_guard lock(gSceneDependenciesMutex);
+  auto &dependents = gSceneDependencies[source];
+  if (std::find(dependents.begin(), dependents.end(), dependent) == dependents.end()) {
+    dependents.push_back(dependent);
+  }
+}
+
+void unregisterSceneDependency(Scene *source, Scene *dependent) {
+  std::lock_guard lock(gSceneDependenciesMutex);
+  auto it = gSceneDependencies.find(source);
+  if (it == gSceneDependencies.end()) {
+    return;
+  }
+
+  auto &dependents = it->second;
+  dependents.erase(std::remove(dependents.begin(), dependents.end(), dependent), dependents.end());
+  if (dependents.empty()) {
+    gSceneDependencies.erase(it);
+  }
+}
+
+void notifySceneVersionChanged(Scene *source, bool renderOnly) {
+  std::vector<Scene *> dependents;
+  {
+    std::lock_guard lock(gSceneDependenciesMutex);
+    auto it = gSceneDependencies.find(source);
+    if (it != gSceneDependencies.end()) {
+      dependents = it->second;
+    }
+  }
+
+  for (auto dependent : dependents) {
+    if (renderOnly) {
+      dependent->updateRenderVersion();
+    } else {
+      dependent->updateVersion();
+    }
+  }
+}
+} // namespace detail
 
 struct PointLightData {
   glm::vec4 position;
@@ -631,9 +685,13 @@ void Scene::reorderLights() {
 void Scene::updateVersion() {
   mVersion++;
   mRenderVersion++;
+  detail::notifySceneVersionChanged(this, false);
 }
 
-void Scene::updateRenderVersion() { mRenderVersion++; }
+void Scene::updateRenderVersion() {
+  mRenderVersion++;
+  detail::notifySceneVersionChanged(this, true);
+}
 
 void Scene::prepareObjectTransformBuffer() {
   size_t gpuTransformBufferSize = getGpuTransformBufferSize();

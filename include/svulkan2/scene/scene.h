@@ -64,18 +64,21 @@ public:
 
   virtual std::vector<Object *> getObjects();
 
-  std::vector<LineObject *> getLineObjects();
-  std::vector<PointObject *> getPointObjects();
-  std::vector<Camera *> getCameras();
-  std::vector<PointLight *> getPointLights();
-  std::vector<DirectionalLight *> getDirectionalLights();
-  std::vector<SpotLight *> getSpotLights();
-  std::vector<TexturedLight *> getTexturedLights();
-  std::vector<ParallelogramLight *> getParallelogramLights();
+  virtual std::vector<LineObject *> getLineObjects();
+  virtual std::vector<PointObject *> getPointObjects();
+  virtual std::vector<Camera *> getCameras();
+  virtual std::vector<PointLight *> getPointLights();
+  virtual std::vector<DirectionalLight *> getDirectionalLights();
+  virtual std::vector<SpotLight *> getSpotLights();
+  virtual std::vector<TexturedLight *> getTexturedLights();
+  virtual std::vector<ParallelogramLight *> getParallelogramLights();
 
   void setEnvironmentMap(std::shared_ptr<resource::SVCubemap> map) { mEnvironmentMap = map; }
 
   std::shared_ptr<resource::SVCubemap> getEnvironmentMap() const { return mEnvironmentMap; }
+
+  void setBatchedRenderShared(bool shared) { mBatchedRenderShared = shared; }
+  bool isBatchedRenderShared() const { return mBatchedRenderShared; }
 
   Scene();
   Scene(Scene const &other) = delete;
@@ -167,6 +170,8 @@ protected:
   // lighting
   glm::vec4 mAmbientLight{};
   std::shared_ptr<resource::SVCubemap> mEnvironmentMap{};
+
+  bool mBatchedRenderShared{false};
 
   /** when anything is added or removed, the version changes */
   uint64_t mVersion{1l};
