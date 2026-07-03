@@ -196,6 +196,10 @@ std::shared_ptr<resource::SVMesh> Context::createTriangleMesh(
     mesh->setVertexAttribute("uv", uvs_);
   }
 
+  if (indices.size()) {
+    mesh->setIndices(indices);
+  }
+
   return mesh;
 }
 

@@ -30,13 +30,8 @@ void Queue::submit(vk::ArrayProxyNoTemporaries<vk::CommandBuffer const> const &c
                    vk::ArrayProxyNoTemporaries<vk::Semaphore const> const &signalSemaphores,
                    vk::Fence fence) {
 
-  std::vector<vk::CommandBuffer> commandBuffers_(commandBuffers.begin(), commandBuffers.end());
-  std::vector<vk::Semaphore> waitSemaphores_(waitSemaphores.begin(), waitSemaphores.end());
-  std::vector<vk::Semaphore> signalSemaphores_(signalSemaphores.begin(), signalSemaphores.end());
-  std::vector<vk::PipelineStageFlags> waitStageMasks_(waitStageMasks.begin(),
-                                                      waitStageMasks.end());
+  vk::SubmitInfo info(waitSemaphores, waitStageMasks, commandBuffers, signalSemaphores);
   std::lock_guard lock(mMutex);
-  vk::SubmitInfo info(waitSemaphores_, waitStageMasks_, commandBuffers_, signalSemaphores_);
   mQueue.submit(info, fence);
 }
 
@@ -55,12 +50,8 @@ Queue::submitAndWait(vk::ArrayProxyNoTemporaries<vk::CommandBuffer const> const 
 vk::Result Queue::present(vk::ArrayProxyNoTemporaries<vk::Semaphore const> const &waitSemaphores,
                           vk::ArrayProxyNoTemporaries<vk::SwapchainKHR const> const &swapchains,
                           vk::ArrayProxyNoTemporaries<uint32_t const> const &imageIndices) {
-  std::vector<vk::Semaphore> waitSemaphores_(waitSemaphores.begin(), waitSemaphores.end());
-  std::vector<vk::SwapchainKHR> swapchains_(swapchains.begin(), swapchains.end());
-  std::vector<uint32_t> imageIndices_(imageIndices.begin(), imageIndices.end());
-
+  vk::PresentInfoKHR info(waitSemaphores, swapchains, imageIndices);
   std::lock_guard lock(mMutex);
-  vk::PresentInfoKHR info(waitSemaphores_, swapchains_, imageIndices_);
   return mQueue.presentKHR(info);
 }
 

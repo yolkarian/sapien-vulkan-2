@@ -151,7 +151,7 @@ void Buffer::upload(void const *data, size_t size, size_t offset) {
       unmap();
     }
     if (!mHostCoherent) {
-      flush();
+      vmaFlushAllocation(mDevice->getAllocator().getVmaAllocator(), mAllocation, offset, size);
     }
   } else {
     auto stagingBuffer = Buffer::CreateStaging(size);

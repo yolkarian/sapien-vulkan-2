@@ -32,6 +32,13 @@ struct LightBufferData {
   int height;
 };
 
+struct ScopedBufferMapping {
+  explicit ScopedBufferMapping(core::Buffer &buffer) : buffer(buffer) { buffer.map(); }
+  ~ScopedBufferMapping() { buffer.unmap(); }
+
+  core::Buffer &buffer;
+};
+
 Scene::Scene() {
   mNodes.push_back(std::make_unique<Node>());
   mRootNode = mNodes.back().get();
@@ -392,6 +399,10 @@ void Scene::uploadToDevice(core::Buffer &sceneBuffer, StructDataLayout const &sc
   std::vector<DirectionalLightData> directionalLightData;
   std::vector<SpotLightData> spotLightData;
   std::vector<SpotLightData> texturedLightData;
+  pointLightData.reserve(pointLights.size());
+  directionalLightData.reserve(directionalLights.size());
+  spotLightData.reserve(spotLights.size());
+  texturedLightData.reserve(texturedLights.size());
   for (auto light : pointLights) {
     pointLightData.push_back(
         {.position = light->getTransform().worldModelMatrix * glm::vec4(0, 0, 0, 1),
@@ -417,6 +428,7 @@ void Scene::uploadToDevice(core::Buffer &sceneBuffer, StructDataLayout const &sc
                                  .color = glm::vec4(light->getColor(), light->getFovSmall())});
   }
 
+  ScopedBufferMapping sceneMapping(sceneBuffer);
   sceneBuffer.upload(&mAmbientLight, 16, sceneLayout.elements.at("ambientLight").offset);
   uint32_t numPointLights = mPointLights.size();
   uint32_t numDirectionalLights = mDirectionalLights.size();
@@ -478,6 +490,8 @@ void Scene::uploadShadowToDevice(core::Buffer &shadowBuffer,
   uint32_t maxNumTexturedLightShadows =
       shadowLayout.elements.at("texturedLightBuffers").size /
       shadowLayout.elements.at("texturedLightBuffers").member->size;
+
+  ScopedBufferMapping shadowMapping(shadowBuffer);
 
   uint32_t lightBufferIndex = 0;
   {
@@ -649,6 +663,7 @@ void Scene::prepareObjectTransformBuffer() {
 
   // no need to create buffer if it is large enough
   if (mTransformBuffer && mTransformBuffer->getSize() >= gpuTransformBufferSize * count) {
+    mTransformBufferVersion = mVersion;
     return;
   }
 

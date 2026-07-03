@@ -7,6 +7,7 @@
 #include "svulkan2/shader/primitive.h"
 #include "svulkan2/shader/primitive_shadow.h"
 #include "svulkan2/shader/shadow.h"
+#include <array>
 
 namespace svulkan2 {
 namespace renderer {
@@ -520,7 +521,7 @@ void Renderer::recordShadows() {
           }
           mShadowCommandBuffer->bindVertexBuffers(0,
                                                   shape->mesh->getVertexBuffer().getVulkanBuffer(),
-                                                  std::vector<vk::DeviceSize>(1, 0));
+                                                  vk::DeviceSize(0));
           mShadowCommandBuffer->bindIndexBuffer(shape->mesh->getIndexBuffer().getVulkanBuffer(), 0,
                                                 vk::IndexType::eUint32);
           mShadowCommandBuffer->drawIndexed(shape->mesh->getTriangleCount() * 3, 1, 0, 0, 0);
@@ -882,7 +883,7 @@ void Renderer::recordRenderPasses() {
         }
         mRenderCommandBuffer->bindVertexBuffers(0,
                                                 shape->mesh->getVertexBuffer().getVulkanBuffer(),
-                                                std::vector<vk::DeviceSize>(1, 0));
+                                                vk::DeviceSize(0));
         mRenderCommandBuffer->bindIndexBuffer(shape->mesh->getIndexBuffer().getVulkanBuffer(), 0,
                                               vk::IndexType::eUint32);
         mRenderCommandBuffer->setCullMode(shape->material->getCullMode());
@@ -1197,7 +1198,8 @@ void Renderer::render(scene::Camera &camera, std::vector<vk::Semaphore> const &w
     uploadGpuResources(camera);
   }
 
-  std::vector<vk::CommandBuffer> cbs = {mShadowCommandBuffer.get(), mRenderCommandBuffer.get()};
+  std::array<vk::CommandBuffer, 2> cbs = {mShadowCommandBuffer.get(),
+                                          mRenderCommandBuffer.get()};
   mContext->getQueue().submit(cbs, waitSemaphores, waitStages, signalSemaphores, fence);
 }
 
@@ -1220,7 +1222,8 @@ void Renderer::render(
     uploadGpuResources(camera);
   }
 
-  std::vector<vk::CommandBuffer> cbs = {mShadowCommandBuffer.get(), mRenderCommandBuffer.get()};
+  std::array<vk::CommandBuffer, 2> cbs = {mShadowCommandBuffer.get(),
+                                          mRenderCommandBuffer.get()};
   mContext->getQueue().submit(cbs, waitSemaphores, waitStageMasks, waitValues, signalSemaphores,
                               signalValues, {});
 }
