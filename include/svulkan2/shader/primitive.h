@@ -15,6 +15,11 @@ public:
     return mVertexInputLayout;
   }
 
+  inline std::shared_ptr<SpecializationConstantLayout>
+  getSpecializationConstantLayout() const {
+    return mSpecializationConstantLayout;
+  }
+
   inline std::shared_ptr<OutputDataLayout> getTextureOutputLayout() const override {
     return mTextureOutputLayout;
   }

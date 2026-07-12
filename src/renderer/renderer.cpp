@@ -72,6 +72,27 @@ Renderer::Renderer(std::shared_ptr<RendererConfig> config) {
   // preload the shader pack to get vertex layouts
   mShaderPack = mContext->getResourceManager()->CreateShaderPack(config->shaderDir);
 
+  // Make reflected shader defaults visible through the custom-property API.
+  for (auto const &pass : mShaderPack->getNonShadowPasses()) {
+    std::shared_ptr<SpecializationConstantLayout> layout;
+    if (auto parser = std::dynamic_pointer_cast<shader::GbufferPassParser>(pass)) {
+      layout = parser->getSpecializationConstantLayout();
+    } else if (auto parser = std::dynamic_pointer_cast<shader::DeferredPassParser>(pass)) {
+      layout = parser->getSpecializationConstantLayout();
+    } else if (auto parser = std::dynamic_pointer_cast<shader::PrimitivePassParser>(pass)) {
+      layout = parser->getSpecializationConstantLayout();
+    }
+    if (!layout) {
+      continue;
+    }
+    for (auto const &[name, element] : layout->elements) {
+      SpecializationConstantValue value;
+      value.dtype = element.dtype;
+      std::memcpy(value.buffer, element.buffer, element.dtype.size());
+      mSpecializationConstants.try_emplace(name, value);
+    }
+  }
+
   // make sure only forward renderer uses msaa
   if (mShaderPack->hasDeferredPass()) {
     mConfig->msaa = vk::SampleCountFlagBits::e1;
@@ -939,7 +960,9 @@ void Renderer::prepareRender(scene::Camera &camera) {
 
   if (mEnvironmentMap != mScene->getEnvironmentMap()) {
     mEnvironmentMap = mScene->getEnvironmentMap();
-    mEnvironmentMap->load();
+    if (mEnvironmentMap) {
+      mEnvironmentMap->load();
+    }
     mRequiresRebuild = true;
   }
 
@@ -1733,7 +1756,7 @@ glm::vec3 Renderer::getCustomPropertyVec3(std::string const &name) const {
 glm::vec4 Renderer::getCustomPropertyVec4(std::string const &name) const {
   if (mSpecializationConstants.contains(name)) {
     auto c = mSpecializationConstants.at(name);
-    if (c.dtype == DataType::FLOAT3()) {
+    if (c.dtype == DataType::FLOAT4()) {
       glm::vec4 v;
       std::memcpy(&v[0], c.buffer, sizeof(float) * 4);
       return v;

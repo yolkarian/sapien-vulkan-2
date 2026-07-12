@@ -449,6 +449,15 @@ void Scene::uploadToDevice(core::Buffer &sceneBuffer, StructDataLayout const &sc
   auto spotLights = getSpotLights();
   auto texturedLights = getTexturedLights();
 
+  // Raster shaders bind shadow maps before unshadowed lights. Keep the light
+  // buffers in the same stable order so mixed shadow settings address the
+  // matching light and shadow map.
+  auto shadowsFirst = [](auto const *light) { return light->isShadowEnabled(); };
+  std::stable_partition(pointLights.begin(), pointLights.end(), shadowsFirst);
+  std::stable_partition(directionalLights.begin(), directionalLights.end(), shadowsFirst);
+  std::stable_partition(spotLights.begin(), spotLights.end(), shadowsFirst);
+  std::stable_partition(texturedLights.begin(), texturedLights.end(), shadowsFirst);
+
   std::vector<PointLightData> pointLightData;
   std::vector<DirectionalLightData> directionalLightData;
   std::vector<SpotLightData> spotLightData;
@@ -840,18 +849,19 @@ std::shared_ptr<core::Buffer> Scene::getObjectTransformBuffer() {
 }
 
 void Scene::ensureBLAS() {
-  // TODO ensure BLAS is not built multiple times, some rigid, some deformable
-  for (auto &obj : mObjects) {
+  // Use the virtual getters so SceneGroup also initializes resources owned by
+  // its child scenes. Child objects are built update-capable because their
+  // rigid/deformable storage is private to the source scene.
+  for (auto obj : getObjects()) {
     if (!obj->getModel()->getBLAS()) {
-      obj->getModel()->buildBLAS(false);
+      bool isLocalRigid = std::any_of(mObjects.begin(), mObjects.end(),
+                                      [obj](auto const &localObject) {
+                                        return localObject.get() == obj;
+                                      });
+      obj->getModel()->buildBLAS(!isLocalRigid);
     }
   }
-  for (auto &obj : mDeformableObjects) {
-    if (!obj->getModel()->getBLAS()) {
-      obj->getModel()->buildBLAS(true);
-    }
-  }
-  for (auto &obj : mPointObjects) {
+  for (auto obj : getPointObjects()) {
     if (!obj->getPointSet()->getBLAS()) {
       obj->getPointSet()->buildBLAS(true);
     }
@@ -1098,30 +1108,36 @@ void Scene::createRTStorageBuffers(StructDataLayout const &materialBufferLayout,
   }
 
   // begin lights
+  auto pointLights = getPointLights();
+  auto directionalLights = getDirectionalLights();
+  auto spotLights = getSpotLights();
+  auto texturedLights = getTexturedLights();
+  auto parallelogramLights = getParallelogramLights();
+
   mRTPointLightBufferHost.clear();
-  for (auto &l : mPointLights) {
+  for (auto l : pointLights) {
     mRTPointLightBufferHost.push_back(
         RTPointLight{.position = l->getPosition(), .radius = 0, .rgb = l->getColor()});
   }
   mRTPointLightBuffer = core::Buffer::Create(
-      std::max(getPointLights().size(), size_t(1)) * sizeof(RTPointLight),
+      std::max(pointLights.size(), size_t(1)) * sizeof(RTPointLight),
       vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
       VMA_MEMORY_USAGE_CPU_TO_GPU);
   mRTPointLightBuffer->upload(mRTPointLightBufferHost);
 
   mRTDirectionalLightBufferHost.clear();
-  for (auto &l : mDirectionalLights) {
-    mRTDirectionalLightBufferHost.push_back(
-        RTDirectionalLight{.direction = l->getDirection(), .softness = 0, .rgb = l->getColor()});
+  for (auto l : directionalLights) {
+    mRTDirectionalLightBufferHost.push_back(RTDirectionalLight{
+        .direction = l->getDirection(), .softness = l->getSoftness(), .rgb = l->getColor()});
   }
   mRTDirectionalLightBuffer = core::Buffer::Create(
-      std::max(getDirectionalLights().size(), size_t(1)) * sizeof(RTDirectionalLight),
+      std::max(directionalLights.size(), size_t(1)) * sizeof(RTDirectionalLight),
       vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
       VMA_MEMORY_USAGE_CPU_TO_GPU);
   mRTDirectionalLightBuffer->upload(mRTDirectionalLightBufferHost);
 
   mRTSpotLightBufferHost.clear();
-  for (auto &l : mSpotLights) {
+  for (auto l : spotLights) {
     mRTSpotLightBufferHost.push_back(
         RTSpotLight{.viewMat = glm::affineInverse(l->getTransform().worldModelMatrix),
                     .projMat = l->getShadowProjectionMatrix(),
@@ -1131,7 +1147,7 @@ void Scene::createRTStorageBuffers(StructDataLayout const &materialBufferLayout,
                     .fovOuter = l->getFov(),
                     .textureId = -1});
   }
-  for (auto &l : mTexturedLights) {
+  for (auto l : texturedLights) {
     auto tex = l->getTexture();
     tex->loadAsync().get(); // TODO: move to top
     tex->uploadToDevice();
@@ -1151,14 +1167,13 @@ void Scene::createRTStorageBuffers(StructDataLayout const &materialBufferLayout,
                     .textureId = textureId});
   }
   mRTSpotLightBuffer = core::Buffer::Create(
-      std::max(getTexturedLights().size() + getSpotLights().size(), size_t(1)) *
-          sizeof(RTSpotLight),
+      std::max(texturedLights.size() + spotLights.size(), size_t(1)) * sizeof(RTSpotLight),
       vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
       VMA_MEMORY_USAGE_CPU_TO_GPU);
   mRTSpotLightBuffer->upload(mRTSpotLightBufferHost);
 
   mRTParallelogramLightBufferHost.clear();
-  for (auto &l : mParallelogramLights) {
+  for (auto l : parallelogramLights) {
     mRTParallelogramLightBufferHost.push_back(RTParallelogramLight{
         .color = l->getColor(),
         .position = l->getOrigin(),
@@ -1167,7 +1182,7 @@ void Scene::createRTStorageBuffers(StructDataLayout const &materialBufferLayout,
     });
   }
   mRTParallelogramLightBuffer = core::Buffer::Create(
-      std::max(getParallelogramLights().size(), size_t(1)) * sizeof(RTParallelogramLight),
+      std::max(parallelogramLights.size(), size_t(1)) * sizeof(RTParallelogramLight),
       vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
       VMA_MEMORY_USAGE_CPU_TO_GPU);
   mRTParallelogramLightBuffer->upload(mRTParallelogramLightBufferHost);
@@ -1182,7 +1197,7 @@ void Scene::createRTStorageBuffers(StructDataLayout const &materialBufferLayout,
 
 void Scene::updateRTStorageBuffers() {
   uint32_t i = 0;
-  for (auto &l : mPointLights) {
+  for (auto l : getPointLights()) {
     auto &b = mRTPointLightBufferHost.at(i);
     b.position = l->getPosition();
     b.radius = 0;
@@ -1192,17 +1207,17 @@ void Scene::updateRTStorageBuffers() {
   mRTPointLightBuffer->upload(mRTPointLightBufferHost);
 
   i = 0;
-  for (auto &l : mDirectionalLights) {
+  for (auto l : getDirectionalLights()) {
     auto &b = mRTDirectionalLightBufferHost.at(i);
     b.direction = l->getDirection();
-    b.softness = 0;
+    b.softness = l->getSoftness();
     b.rgb = l->getColor();
     ++i;
   }
   mRTDirectionalLightBuffer->upload(mRTDirectionalLightBufferHost);
 
   i = 0;
-  for (auto &l : mSpotLights) {
+  for (auto l : getSpotLights()) {
     auto &b = mRTSpotLightBufferHost.at(i);
     b.viewMat = glm::affineInverse(l->getTransform().worldModelMatrix);
     b.projMat = l->getShadowProjectionMatrix();
@@ -1212,7 +1227,7 @@ void Scene::updateRTStorageBuffers() {
     b.fovOuter = l->getFov();
     ++i;
   }
-  for (auto &l : mTexturedLights) {
+  for (auto l : getTexturedLights()) {
     auto &b = mRTSpotLightBufferHost.at(i);
     b.viewMat = glm::affineInverse(l->getTransform().worldModelMatrix);
     b.projMat = l->getShadowProjectionMatrix();
@@ -1225,7 +1240,7 @@ void Scene::updateRTStorageBuffers() {
   mRTSpotLightBuffer->upload(mRTSpotLightBufferHost);
 
   i = 0;
-  for (auto &l : mParallelogramLights) {
+  for (auto l : getParallelogramLights()) {
     auto &b = mRTParallelogramLightBufferHost.at(i);
     b.color = l->getColor();
     b.position = l->getOrigin();

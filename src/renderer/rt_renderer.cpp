@@ -28,6 +28,7 @@ RTRenderer::RTRenderer(std::string const &shaderDir) : mShaderDir(shaderDir) {
   mCustomPropertiesInt["maxDepth"] = 3;
   mCustomPropertiesInt["russianRoulette"] = 0;
   mCustomPropertiesInt["russianRouletteMinBounces"] = 2;
+  mCustomPropertiesInt["toneMapper"] = 2;
   mCustomPropertiesFloat["exposure"] = 1.f;
   mCustomPropertiesFloat["aperture"] = 0.f;
   mCustomPropertiesFloat["focusPlane"] = 1.f;
@@ -99,13 +100,16 @@ void RTRenderer::updateObjects() {
 void RTRenderer::prepareRender(scene::Camera &camera) {
   if (mEnvironmentMap != mScene->getEnvironmentMap()) {
     mEnvironmentMap = mScene->getEnvironmentMap();
-    mEnvironmentMap->load();
+    if (mEnvironmentMap) {
+      mEnvironmentMap->load();
+    }
     mRequiresRebuild = true;
   }
 
-  auto objects = camera.getScene()->getObjects();
-  // auto objects = camera.getScene()->getVisibleObjects();
-  auto scene = camera.getScene();
+  // A batched camera can render a SceneGroup while remaining attached to its
+  // original scene. RT resources must be built for the renderer's scene,
+  // which is also the scene consumed by prepareScene().
+  auto scene = mScene;
   if (mSceneVersion != scene->getVersion()) {
     mRequiresRebuild = true;
   }
@@ -632,10 +636,15 @@ void RTRenderer::preparePostprocessing() {
   mPostprocessingSets.clear(); // delete sets before deleting pool
 
   // create descriptor sets, bind images to them
-  mPostprocessingPool = std::make_unique<core::DynamicDescriptorPool>(
-      std::vector<vk::DescriptorPoolSize>{{vk::DescriptorType::eStorageBuffer, 10}}); // TODO adapt
-
   auto &parsers = mShaderPack->getPostprocessingParsers();
+  uint32_t storageImageCount = 0;
+  for (auto const &parser : parsers) {
+    storageImageCount += parser->getResources().begin()->second.bindings.size();
+  }
+  mPostprocessingPool = std::make_unique<core::DynamicDescriptorPool>(
+      std::vector<vk::DescriptorPoolSize>{{vk::DescriptorType::eStorageImage,
+                                           std::max(storageImageCount, 1u)}});
+
   for (uint32_t pid = 0; pid < parsers.size(); ++pid) {
     auto &layout = layouts.at(pid);
     mPostprocessingSets.push_back(mPostprocessingPool->allocateSet(layout.get()));
@@ -890,9 +899,8 @@ void RTRenderer::recordPostprocess() {
 
   auto pushConstantLayout = mShaderPack->getPushConstantLayout();
 
-  // TODO insert memory barrier between render passes
-  // currently it only works for a single pass
-  for (uint32_t i = 0; i < mShaderPackInstance->getPostprocessingPipelines().size(); ++i) {
+  auto const &pipelines = mShaderPackInstance->getPostprocessingPipelines();
+  for (uint32_t i = 0; i < pipelines.size(); ++i) {
     mPostprocessCommandBuffer->pushConstants(
         mShaderPackInstance->getPostprocessingPipelineLayouts().at(i).get(),
         vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eMissKHR |
@@ -907,6 +915,15 @@ void RTRenderer::recordPostprocess() {
         mShaderPackInstance->getPostprocessingPipelineLayouts().at(i).get(), 0,
         mPostprocessingSets.at(i).get(), {});
     mPostprocessCommandBuffer->dispatch(mWidth, mHeight, 1);
+
+    if (i + 1 < pipelines.size()) {
+      vk::MemoryBarrier barrier(vk::AccessFlagBits::eShaderWrite,
+                                vk::AccessFlagBits::eShaderRead |
+                                    vk::AccessFlagBits::eShaderWrite);
+      mPostprocessCommandBuffer->pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                                                 vk::PipelineStageFlagBits::eComputeShader, {},
+                                                 barrier, {}, {});
+    }
   }
   mPostprocessCommandBuffer->end();
 }
