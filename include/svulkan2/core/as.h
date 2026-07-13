@@ -39,10 +39,12 @@ public:
   void build();
   void recordUpdate(vk::CommandBuffer commandBuffer,
                     std::vector<vk::TransformMatrixKHR> const &transforms);
+  void recordUpdate(vk::CommandBuffer commandBuffer);
 
   vk::DeviceAddress getAddress();
 
   vk::AccelerationStructureKHR getVulkanAS() const { return mAS.get(); };
+  Buffer &getInstanceBuffer() const { return *mInstanceBuffer; }
 
 private:
   std::vector<vk::AccelerationStructureInstanceKHR> mInstances;

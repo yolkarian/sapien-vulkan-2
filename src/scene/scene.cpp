@@ -906,7 +906,7 @@ void Scene::buildTLAS() {
   mTLAS->build();
 }
 
-void Scene::updateTLAS() {
+void Scene::updateTLAS(bool useDeviceTransforms) {
   if (!mASUpdateCommandBuffer) {
     mASUpdateCommandBuffer = getCommandPool().allocateCommandBuffer();
   }
@@ -923,27 +923,31 @@ void Scene::updateTLAS() {
     obj->getPointSet()->recordUpdateBLAS(mASUpdateCommandBuffer.get());
   }
 
-  std::vector<vk::TransformMatrixKHR> transforms;
-  auto objects = getObjects();
-  auto pointObjects = getPointObjects();
+  if (useDeviceTransforms) {
+    mTLAS->recordUpdate(mASUpdateCommandBuffer.get());
+  } else {
+    std::vector<vk::TransformMatrixKHR> transforms;
+    auto objects = getObjects();
+    auto pointObjects = getPointObjects();
 
-  transforms.reserve(objects.size() + pointObjects.size());
+    transforms.reserve(objects.size() + pointObjects.size());
 
-  for (auto obj : objects) {
-    glm::mat4 modelTranspose = glm::transpose(obj->getTransform().worldModelMatrix);
-    vk::TransformMatrixKHR mat;
-    std::memcpy(&mat.matrix[0][0], &modelTranspose, sizeof(mat));
-    transforms.push_back(mat);
+    for (auto obj : objects) {
+      glm::mat4 modelTranspose = glm::transpose(obj->getTransform().worldModelMatrix);
+      vk::TransformMatrixKHR mat;
+      std::memcpy(&mat.matrix[0][0], &modelTranspose, sizeof(mat));
+      transforms.push_back(mat);
+    }
+
+    for (auto obj : pointObjects) {
+      glm::mat4 modelTranspose = glm::transpose(obj->getTransform().worldModelMatrix);
+      vk::TransformMatrixKHR mat;
+      std::memcpy(&mat.matrix[0][0], &modelTranspose, sizeof(mat));
+      transforms.push_back(mat);
+    }
+
+    mTLAS->recordUpdate(mASUpdateCommandBuffer.get(), transforms);
   }
-
-  for (auto obj : pointObjects) {
-    glm::mat4 modelTranspose = glm::transpose(obj->getTransform().worldModelMatrix);
-    vk::TransformMatrixKHR mat;
-    std::memcpy(&mat.matrix[0][0], &modelTranspose, sizeof(mat));
-    transforms.push_back(mat);
-  }
-
-  mTLAS->recordUpdate(mASUpdateCommandBuffer.get(), transforms);
   mASUpdateCommandBuffer->end();
   core::Context::Get()->getQueue().submit(mASUpdateCommandBuffer.get(), {});
 }
@@ -1276,7 +1280,7 @@ void Scene::buildRTResources(StructDataLayout const &materialBufferLayout,
   }
 }
 
-void Scene::updateRTResources() {
+void Scene::updateRTResources(bool useDeviceTransforms) {
   std::lock_guard lock(mRTResourcesLock);
   if (mRTResourcesVersion != mVersion) {
     throw std::runtime_error("updateRTResources failed: scene has changed, "
@@ -1291,7 +1295,7 @@ void Scene::updateRTResources() {
     }
   }
 
-  updateTLAS();
+  updateTLAS(useDeviceTransforms);
   updateRTStorageBuffers();
   mRTResourcesRenderVersion = mRenderVersion;
 }

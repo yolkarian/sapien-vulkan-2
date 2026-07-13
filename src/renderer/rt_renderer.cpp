@@ -147,8 +147,10 @@ void RTRenderer::prepareRender(scene::Camera &camera) {
   if (mSceneRenderVersion != mScene->getRenderVersion() || mRequiresRebuild) {
     updateObjects();
 
-    mScene->updateRTResources();                                // update TLAS
-    camera.uploadToDevice(*mCameraBuffer, mCameraBufferLayout); // update camera
+    mScene->updateRTResources(mExternalTransformUpdates); // update TLAS
+    if (mAutoUpload) {
+      camera.uploadToDevice(*mCameraBuffer, mCameraBufferLayout); // update camera
+    }
     mFrameCount = 0;
     mSceneRenderVersion = mScene->getRenderVersion();
   } else {
@@ -570,7 +572,10 @@ void RTRenderer::prepareCamera() {
   auto &set = mShaderPack->getCameraDescription();
   for (auto &[bid, binding] : set.bindings) {
     if (binding.name == "CameraBuffer") {
-      mCameraBuffer = core::Buffer::CreateUniform(set.buffers.at(binding.arrayIndex)->size);
+      if (!mCameraBuffer) {
+        mCameraBuffer =
+            core::Buffer::CreateUniform(set.buffers.at(binding.arrayIndex)->size, true, true);
+      }
       if (bid != 0) {
         throw std::runtime_error("CameraBuffer must have binding 0");
       }
@@ -926,6 +931,13 @@ void RTRenderer::recordPostprocess() {
     }
   }
   mPostprocessCommandBuffer->end();
+}
+
+core::Buffer &RTRenderer::getCameraBuffer() {
+  if (!mCameraBuffer) {
+    throw std::runtime_error("camera buffer is not initialized");
+  }
+  return *mCameraBuffer;
 }
 
 RTRenderer::~RTRenderer() {

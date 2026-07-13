@@ -112,7 +112,7 @@ public:
   void buildRTResources(StructDataLayout const &materialBufferLayout,
                         StructDataLayout const &textureIndexBufferLayout,
                         StructDataLayout const &geometryInstanceBufferLayout);
-  void updateRTResources();
+  void updateRTResources(bool useDeviceTransforms = false);
   inline core::TLAS *getTLAS() const { return mTLAS.get(); }
 
   inline std::vector<vk::Buffer> const &getRTPointSetBuffers() { return mPointSetBuffers; }
@@ -197,7 +197,7 @@ protected:
   void buildTLAS();
 
   void updateDynamicBLAS();
-  void updateTLAS();
+  void updateTLAS(bool useDeviceTransforms);
   void createRTStorageBuffers(StructDataLayout const &materialBufferLayout,
                               StructDataLayout const &textureIndexBufferLayout,
                               StructDataLayout const &geometryInstanceBufferLayout);

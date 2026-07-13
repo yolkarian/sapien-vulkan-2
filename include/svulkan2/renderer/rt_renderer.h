@@ -89,6 +89,13 @@ public:
   std::vector<std::string> getDisplayTargetNames() const override;
   std::vector<std::string> getRenderTargetNames() const override;
 
+  core::Buffer &getCameraBuffer();
+  void setAutoUploadEnabled(bool enable) { mAutoUpload = enable; }
+  bool getAutoUploadEnabled() const { return mAutoUpload; }
+  void setExternalTransformUpdatesEnabled(bool enable) {
+    mExternalTransformUpdates = enable;
+  }
+
   core::Image &getRenderImage(std::string const &name) override {
     return mRenderImages.at(name)->getImage();
   }
@@ -188,6 +195,8 @@ private:
   std::vector<uint8_t> mPushConstantBuffer;
 
   bool mRequiresRebuild{true};
+  bool mAutoUpload{true};
+  bool mExternalTransformUpdates{false};
 
   vk::UniqueFence mSceneAccessFence;
 

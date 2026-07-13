@@ -184,11 +184,18 @@ void TLAS::build() {
   auto context = Context::Get();
   uint32_t instanceCount = static_cast<uint32_t>(mInstances.size());
 
+#ifdef SVULKAN2_CUDA_INTEROP
+  constexpr auto instanceMemoryUsage = VmaMemoryUsage::VMA_MEMORY_USAGE_GPU_ONLY;
+  constexpr bool externalInstanceBuffer = true;
+#else
+  constexpr auto instanceMemoryUsage = VmaMemoryUsage::VMA_MEMORY_USAGE_CPU_TO_GPU;
+  constexpr bool externalInstanceBuffer = false;
+#endif
   mInstanceBuffer = core::Buffer::Create(
       sizeof(vk::AccelerationStructureInstanceKHR) * std::max(1u, instanceCount),
-      vk::BufferUsageFlagBits::eShaderDeviceAddress |
+      vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eShaderDeviceAddress |
           vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
-      VmaMemoryUsage::VMA_MEMORY_USAGE_CPU_TO_GPU);
+      instanceMemoryUsage, VmaAllocationCreateFlags{}, externalInstanceBuffer);
   mInstanceBuffer->upload(mInstances);
 
   auto commandPool = context->createCommandPool();
@@ -267,7 +274,10 @@ void TLAS::recordUpdate(vk::CommandBuffer commandBuffer,
     mInstances[i].setTransform(transforms[i]);
   }
   mInstanceBuffer->upload(mInstances);
+  recordUpdate(commandBuffer);
+}
 
+void TLAS::recordUpdate(vk::CommandBuffer commandBuffer) {
   mInstanceBufferAddress = mInstanceBuffer->getAddress();
   vk::AccelerationStructureGeometryInstancesDataKHR instancesData(VK_FALSE,
                                                                   mInstanceBufferAddress);
@@ -281,13 +291,13 @@ void TLAS::recordUpdate(vk::CommandBuffer commandBuffer,
       vk::BuildAccelerationStructureModeKHR::eUpdate, mAS.get(), mAS.get(), tlasGeometry, {},
       mUpdateScratchBufferAddress);
 
-  // wait for upload and BLAS builds
-  vk::MemoryBarrier barrier(vk::AccessFlagBits::eTransferWrite |
+  // Wait for CPU uploads, CUDA external-memory writes, and BLAS builds.
+  vk::MemoryBarrier barrier(vk::AccessFlagBits::eMemoryWrite |
+                                vk::AccessFlagBits::eTransferWrite |
                                 vk::AccessFlagBits::eAccelerationStructureWriteKHR,
                             vk::AccessFlagBits::eAccelerationStructureWriteKHR |
                                 vk::AccessFlagBits::eAccelerationStructureReadKHR);
-  commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer |
-                                    vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
+  commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands,
                                 vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {},
                                 barrier, nullptr, nullptr);
 
