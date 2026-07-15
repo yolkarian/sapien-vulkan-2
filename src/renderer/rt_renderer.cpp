@@ -118,7 +118,7 @@ void RTRenderer::prepareRender(scene::Camera &camera) {
     mFrameCount = 0;
 
     scene->buildRTResources(mMaterialBufferLayout, mTextureIndexBufferLayout,
-                            mGeometryInstanceBufferLayout);
+                            mGeometryInstanceBufferLayout, mExternalTransformUpdates);
 
     mShaderPackInstance = std::make_shared<shader::RayTracingShaderPackInstance>(
         shader::RayTracingShaderPackInstanceDesc{
@@ -573,8 +573,9 @@ void RTRenderer::prepareCamera() {
   for (auto &[bid, binding] : set.bindings) {
     if (binding.name == "CameraBuffer") {
       if (!mCameraBuffer) {
-        mCameraBuffer =
-            core::Buffer::CreateUniform(set.buffers.at(binding.arrayIndex)->size, true, true);
+        mCameraBuffer = core::Buffer::CreateUniform(set.buffers.at(binding.arrayIndex)->size,
+                                                    mExternalCameraUpdates,
+                                                    mExternalCameraUpdates);
       }
       if (bid != 0) {
         throw std::runtime_error("CameraBuffer must have binding 0");
@@ -938,6 +939,23 @@ core::Buffer &RTRenderer::getCameraBuffer() {
     throw std::runtime_error("camera buffer is not initialized");
   }
   return *mCameraBuffer;
+}
+
+void RTRenderer::setExternalCameraUpdatesEnabled(bool enable) {
+  if (mExternalCameraUpdates == enable) {
+    return;
+  }
+  mExternalCameraUpdates = enable;
+  mCameraBuffer.reset();
+  mRequiresRebuild = true;
+}
+
+void RTRenderer::setExternalTransformUpdatesEnabled(bool enable) {
+  if (mExternalTransformUpdates == enable) {
+    return;
+  }
+  mExternalTransformUpdates = enable;
+  mRequiresRebuild = true;
 }
 
 RTRenderer::~RTRenderer() {

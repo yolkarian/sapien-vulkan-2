@@ -92,9 +92,9 @@ public:
   core::Buffer &getCameraBuffer();
   void setAutoUploadEnabled(bool enable) { mAutoUpload = enable; }
   bool getAutoUploadEnabled() const { return mAutoUpload; }
-  void setExternalTransformUpdatesEnabled(bool enable) {
-    mExternalTransformUpdates = enable;
-  }
+  void setExternalCameraUpdatesEnabled(bool enable);
+  bool getExternalCameraUpdatesEnabled() const { return mExternalCameraUpdates; }
+  void setExternalTransformUpdatesEnabled(bool enable);
 
   core::Image &getRenderImage(std::string const &name) override {
     return mRenderImages.at(name)->getImage();
@@ -196,6 +196,7 @@ private:
 
   bool mRequiresRebuild{true};
   bool mAutoUpload{true};
+  bool mExternalCameraUpdates{false};
   bool mExternalTransformUpdates{false};
 
   vk::UniqueFence mSceneAccessFence;

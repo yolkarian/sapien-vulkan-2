@@ -868,7 +868,7 @@ void Scene::ensureBLAS() {
   }
 }
 
-void Scene::buildTLAS() {
+void Scene::buildTLAS(bool externalInstanceBuffer) {
   logger::info("building TLAS");
   auto context = core::Context::Get();
   std::vector<vk::AccelerationStructureInstanceKHR> instances;
@@ -903,7 +903,7 @@ void Scene::buildTLAS() {
   }
 
   mTLAS = std::make_unique<core::TLAS>(instances);
-  mTLAS->build();
+  mTLAS->build(externalInstanceBuffer);
 }
 
 void Scene::updateTLAS(bool useDeviceTransforms) {
@@ -1257,7 +1257,8 @@ void Scene::updateRTStorageBuffers() {
 
 void Scene::buildRTResources(StructDataLayout const &materialBufferLayout,
                              StructDataLayout const &textureIndexBufferLayout,
-                             StructDataLayout const &geometryInstanceBufferLayout) {
+                             StructDataLayout const &geometryInstanceBufferLayout,
+                             bool externalInstanceBuffer) {
 
   std::lock_guard lock(mRTResourcesLock);
 
@@ -1273,10 +1274,12 @@ void Scene::buildRTResources(StructDataLayout const &materialBufferLayout,
 
   if (mRTResourcesVersion != mVersion) {
     ensureBLAS();
-    buildTLAS();
+    buildTLAS(externalInstanceBuffer);
     createRTStorageBuffers(materialBufferLayout, textureIndexBufferLayout,
                            geometryInstanceBufferLayout);
     mRTResourcesVersion = mVersion;
+  } else if (externalInstanceBuffer && !mTLAS->isInstanceBufferExternal()) {
+    mTLAS->enableExternalInstanceBuffer();
   }
 }
 

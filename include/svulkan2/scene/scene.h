@@ -111,7 +111,8 @@ public:
   // ray tracing
   void buildRTResources(StructDataLayout const &materialBufferLayout,
                         StructDataLayout const &textureIndexBufferLayout,
-                        StructDataLayout const &geometryInstanceBufferLayout);
+                        StructDataLayout const &geometryInstanceBufferLayout,
+                        bool externalInstanceBuffer = false);
   void updateRTResources(bool useDeviceTransforms = false);
   inline core::TLAS *getTLAS() const { return mTLAS.get(); }
 
@@ -194,7 +195,7 @@ protected:
 
   // ray tracing helpers
   void ensureBLAS();
-  void buildTLAS();
+  void buildTLAS(bool externalInstanceBuffer);
 
   void updateDynamicBLAS();
   void updateTLAS(bool useDeviceTransforms);

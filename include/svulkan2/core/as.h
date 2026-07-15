@@ -36,10 +36,13 @@ class TLAS {
 
 public:
   TLAS(std::vector<vk::AccelerationStructureInstanceKHR> const &instances);
-  void build();
+  void build(bool externalInstanceBuffer = false);
   void recordUpdate(vk::CommandBuffer commandBuffer,
                     std::vector<vk::TransformMatrixKHR> const &transforms);
   void recordUpdate(vk::CommandBuffer commandBuffer);
+
+  void enableExternalInstanceBuffer();
+  bool isInstanceBufferExternal() const { return mInstanceBufferExternal; }
 
   vk::DeviceAddress getAddress();
 
@@ -47,9 +50,12 @@ public:
   Buffer &getInstanceBuffer() const { return *mInstanceBuffer; }
 
 private:
+  void createInstanceBuffer(bool external);
+
   std::vector<vk::AccelerationStructureInstanceKHR> mInstances;
 
   std::unique_ptr<Buffer> mInstanceBuffer;
+  bool mInstanceBufferExternal{};
   vk::DeviceAddress mInstanceBufferAddress;
 
   std::unique_ptr<Buffer> mUpdateScratchBuffer;
