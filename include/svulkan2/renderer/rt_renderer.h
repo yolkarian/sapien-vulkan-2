@@ -95,6 +95,7 @@ public:
   void setExternalCameraUpdatesEnabled(bool enable);
   bool getExternalCameraUpdatesEnabled() const { return mExternalCameraUpdates; }
   void setExternalTransformUpdatesEnabled(bool enable);
+  void initializeExternalTransformResources(scene::Camera &camera);
 
   core::Image &getRenderImage(std::string const &name) override {
     return mRenderImages.at(name)->getImage();

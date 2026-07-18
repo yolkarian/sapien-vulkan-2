@@ -1,6 +1,7 @@
 #include "svulkan2/renderer/rt_renderer.h"
 #include "../common/logger.h"
 #include "denoiser.h"
+#include "svulkan2/common/profiler.h"
 #include "svulkan2/core/context.h"
 #include "svulkan2/shader/rt.h"
 
@@ -117,8 +118,11 @@ void RTRenderer::prepareRender(scene::Camera &camera) {
   if (mRequiresRebuild) {
     mFrameCount = 0;
 
-    scene->buildRTResources(mMaterialBufferLayout, mTextureIndexBufferLayout,
-                            mGeometryInstanceBufferLayout, mExternalTransformUpdates);
+    {
+      SVULKAN2_PROFILE_BLOCK("Build RT acceleration structures");
+      scene->buildRTResources(mMaterialBufferLayout, mTextureIndexBufferLayout,
+                              mGeometryInstanceBufferLayout, mExternalTransformUpdates);
+    }
 
     mShaderPackInstance = std::make_shared<shader::RayTracingShaderPackInstance>(
         shader::RayTracingShaderPackInstanceDesc{
@@ -147,7 +151,10 @@ void RTRenderer::prepareRender(scene::Camera &camera) {
   if (mSceneRenderVersion != mScene->getRenderVersion() || mRequiresRebuild) {
     updateObjects();
 
-    mScene->updateRTResources(mExternalTransformUpdates); // update TLAS
+    {
+      SVULKAN2_PROFILE_BLOCK("Update RT acceleration structures");
+      mScene->updateRTResources(mExternalTransformUpdates);
+    }
     if (mAutoUpload) {
       camera.uploadToDevice(*mCameraBuffer, mCameraBufferLayout); // update camera
     }
@@ -948,6 +955,14 @@ void RTRenderer::setExternalCameraUpdatesEnabled(bool enable) {
   mExternalCameraUpdates = enable;
   mCameraBuffer.reset();
   mRequiresRebuild = true;
+}
+
+void RTRenderer::initializeExternalTransformResources(scene::Camera &camera) {
+  if (!mExternalTransformUpdates) {
+    throw std::runtime_error(
+        "external transform updates must be enabled before initializing their resources");
+  }
+  prepareRender(camera);
 }
 
 void RTRenderer::setExternalTransformUpdatesEnabled(bool enable) {
