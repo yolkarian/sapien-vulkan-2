@@ -741,7 +741,11 @@ void Scene::prepareObjectTransformBuffer() {
   mTransformBufferCpu =
       core::Buffer::Create(gpuTransformBufferSize * count, vk::BufferUsageFlagBits::eTransferSrc,
                            VMA_MEMORY_USAGE_CPU_ONLY);
-  mTransformBuffer = core::Buffer::CreateUniform(gpuTransformBufferSize * count, true, true);
+  mTransformBuffer = core::Buffer::Create(
+      gpuTransformBufferSize * count,
+      vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst |
+          vk::BufferUsageFlagBits::eStorageBuffer,
+      VMA_MEMORY_USAGE_GPU_ONLY, VmaAllocationCreateFlags{}, true);
   mTransformBufferVersion = mVersion;
 }
 
