@@ -12,7 +12,11 @@ UI_CLASS(Window) {
   UI_ATTRIBUTE(Window, glm::vec2, Size);
 
 public:
+  bool isExpanded() const { return mExpanded; }
   void build() override;
+
+private:
+  bool mExpanded{true};
 };
 
 } // namespace ui
