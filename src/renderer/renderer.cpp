@@ -1127,8 +1127,11 @@ void Renderer::uploadGpuResources(scene::Camera &camera) {
     auto bufferSize = mShaderPack->getShaderInputLayouts()->objectDataBufferLayout->getAlignedSize(
         mContext->getPhysicalDeviceLimits().minUniformBufferOffsetAlignment);
 
-    // update objects
-    mScene->uploadObjectTransforms();
+    // GPU interop can own object transforms while the normal upload path continues to refresh
+    // segmentation, transparency, custom data, camera, scene, and light buffers.
+    if (!mExternalTransformUpdates) {
+      mScene->uploadObjectTransforms();
+    }
 
     mObjectDataBuffer->map();
     auto objects = mScene->getObjects();

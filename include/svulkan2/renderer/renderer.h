@@ -178,6 +178,9 @@ public:
   void setAutoUploadEnabled(bool enable);
   bool getAutoUploadEnabled() { return mAutoUpload; }
 
+  void setExternalTransformUpdatesEnabled(bool enable) { mExternalTransformUpdates = enable; }
+  bool getExternalTransformUpdatesEnabled() const { return mExternalTransformUpdates; }
+
   void forceUploadCameraBuffer(scene::Camera &camera);
 
   Renderer(Renderer const &other) = delete;
@@ -225,6 +228,7 @@ private:
   uint32_t mPointObjectIndex{}; // starting object index for point objects
 
   bool mAutoUpload{true};
+  bool mExternalTransformUpdates{false};
 
   // load and uplaod required resources
   void prepareRender(scene::Camera &camera);
