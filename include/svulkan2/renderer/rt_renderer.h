@@ -94,7 +94,7 @@ public:
   bool getAutoUploadEnabled() const { return mAutoUpload; }
   void setExternalCameraUpdatesEnabled(bool enable);
   bool getExternalCameraUpdatesEnabled() const { return mExternalCameraUpdates; }
-  void setExternalTransformUpdatesEnabled(bool enable);
+  void setExternalTransformUpdatesEnabled(bool enable, bool cudaInterop = true);
   void initializeExternalTransformResources(scene::Camera &camera);
 
   core::Image &getRenderImage(std::string const &name) override {
@@ -199,6 +199,7 @@ private:
   bool mAutoUpload{true};
   bool mExternalCameraUpdates{false};
   bool mExternalTransformUpdates{false};
+  bool mExternalTransformCudaInterop{false};
 
   vk::UniqueFence mSceneAccessFence;
 

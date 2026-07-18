@@ -121,7 +121,7 @@ void RTRenderer::prepareRender(scene::Camera &camera) {
     {
       SVULKAN2_PROFILE_BLOCK("Build RT acceleration structures");
       scene->buildRTResources(mMaterialBufferLayout, mTextureIndexBufferLayout,
-                              mGeometryInstanceBufferLayout, mExternalTransformUpdates);
+                              mGeometryInstanceBufferLayout, mExternalTransformCudaInterop);
     }
 
     mShaderPackInstance = std::make_shared<shader::RayTracingShaderPackInstance>(
@@ -965,11 +965,14 @@ void RTRenderer::initializeExternalTransformResources(scene::Camera &camera) {
   prepareRender(camera);
 }
 
-void RTRenderer::setExternalTransformUpdatesEnabled(bool enable) {
-  if (mExternalTransformUpdates == enable) {
+void RTRenderer::setExternalTransformUpdatesEnabled(bool enable, bool cudaInterop) {
+  cudaInterop &= enable;
+  if (mExternalTransformUpdates == enable &&
+      mExternalTransformCudaInterop == cudaInterop) {
     return;
   }
   mExternalTransformUpdates = enable;
+  mExternalTransformCudaInterop = cudaInterop;
   mRequiresRebuild = true;
 }
 

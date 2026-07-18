@@ -191,7 +191,8 @@ void TLAS::createInstanceBuffer(bool external) {
                               : VmaMemoryUsage::VMA_MEMORY_USAGE_CPU_TO_GPU;
   auto buffer = core::Buffer::Create(
       sizeof(vk::AccelerationStructureInstanceKHR) * std::max<size_t>(1, mInstances.size()),
-      vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eShaderDeviceAddress |
+      vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer |
+          vk::BufferUsageFlagBits::eShaderDeviceAddress |
           vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
       memoryUsage, VmaAllocationCreateFlags{}, external);
   buffer->upload(mInstances);
@@ -317,10 +318,12 @@ void TLAS::recordUpdate(vk::CommandBuffer commandBuffer) {
   } else {
     barrier = vk::MemoryBarrier(vk::AccessFlagBits::eHostWrite |
                                     vk::AccessFlagBits::eTransferWrite |
+                                    vk::AccessFlagBits::eShaderWrite |
                                     vk::AccessFlagBits::eAccelerationStructureWriteKHR,
                                 vk::AccessFlagBits::eAccelerationStructureWriteKHR |
                                     vk::AccessFlagBits::eAccelerationStructureReadKHR);
     sourceStage = vk::PipelineStageFlagBits::eHost | vk::PipelineStageFlagBits::eTransfer |
+                  vk::PipelineStageFlagBits::eComputeShader |
                   vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR;
   }
   commandBuffer.pipelineBarrier(sourceStage,
