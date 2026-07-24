@@ -90,8 +90,8 @@ public:
   std::vector<std::string> getRenderTargetNames() const override;
 
   core::Buffer &getCameraBuffer();
-  void setAutoUploadEnabled(bool enable) { mAutoUpload = enable; }
-  bool getAutoUploadEnabled() const { return mAutoUpload; }
+  void prepareResources(scene::Camera &camera) override;
+  void uploadCpuFrameState(scene::Camera &camera) override;
   void setExternalCameraUpdatesEnabled(bool enable);
   bool getExternalCameraUpdatesEnabled() const { return mExternalCameraUpdates; }
   void setExternalTransformUpdatesEnabled(bool enable, bool cudaInterop = true);
@@ -196,10 +196,11 @@ private:
   std::vector<uint8_t> mPushConstantBuffer;
 
   bool mRequiresRebuild{true};
-  bool mAutoUpload{true};
   bool mExternalCameraUpdates{false};
   bool mExternalTransformUpdates{false};
   bool mExternalTransformCudaInterop{false};
+  bool mEffectiveExternalTransformUpdates{false};
+  bool mEffectiveExternalTransformCudaInterop{false};
 
   vk::UniqueFence mSceneAccessFence;
 

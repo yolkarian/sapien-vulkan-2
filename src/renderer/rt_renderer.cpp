@@ -99,6 +99,16 @@ void RTRenderer::updateObjects() {
 }
 
 void RTRenderer::prepareRender(scene::Camera &camera) {
+  bool sceneExternallyOwned = mScene->hasExternalTransformOwnership();
+  bool effectiveExternalUpdates = mExternalTransformUpdates || sceneExternallyOwned;
+  bool effectiveCudaInterop = mExternalTransformCudaInterop || sceneExternallyOwned;
+  if (effectiveExternalUpdates != mEffectiveExternalTransformUpdates ||
+      effectiveCudaInterop != mEffectiveExternalTransformCudaInterop) {
+    mEffectiveExternalTransformUpdates = effectiveExternalUpdates;
+    mEffectiveExternalTransformCudaInterop = effectiveCudaInterop;
+    mRequiresRebuild = true;
+  }
+
   if (mEnvironmentMap != mScene->getEnvironmentMap()) {
     mEnvironmentMap = mScene->getEnvironmentMap();
     if (mEnvironmentMap) {
@@ -121,7 +131,8 @@ void RTRenderer::prepareRender(scene::Camera &camera) {
     {
       SVULKAN2_PROFILE_BLOCK("Build RT acceleration structures");
       scene->buildRTResources(mMaterialBufferLayout, mTextureIndexBufferLayout,
-                              mGeometryInstanceBufferLayout, mExternalTransformCudaInterop);
+                              mGeometryInstanceBufferLayout,
+                              mEffectiveExternalTransformCudaInterop);
     }
 
     mShaderPackInstance = std::make_shared<shader::RayTracingShaderPackInstance>(
@@ -153,9 +164,9 @@ void RTRenderer::prepareRender(scene::Camera &camera) {
 
     {
       SVULKAN2_PROFILE_BLOCK("Update RT acceleration structures");
-      mScene->updateRTResources(mExternalTransformUpdates);
+      mScene->updateRTResources(mEffectiveExternalTransformUpdates);
     }
-    if (mAutoUpload) {
+    if (mExecutionMode == RenderExecutionMode::eCpuManaged) {
       camera.uploadToDevice(*mCameraBuffer, mCameraBufferLayout); // update camera
     }
     mFrameCount = 0;
@@ -955,6 +966,13 @@ void RTRenderer::setExternalCameraUpdatesEnabled(bool enable) {
   mExternalCameraUpdates = enable;
   mCameraBuffer.reset();
   mRequiresRebuild = true;
+}
+
+void RTRenderer::prepareResources(scene::Camera &camera) { prepareRender(camera); }
+
+void RTRenderer::uploadCpuFrameState(scene::Camera &camera) {
+  // requires prepared resources; object metadata is refreshed by prepareRender
+  camera.uploadToDevice(*mCameraBuffer, mCameraBufferLayout);
 }
 
 void RTRenderer::initializeExternalTransformResources(scene::Camera &camera) {

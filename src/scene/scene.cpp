@@ -758,6 +758,17 @@ size_t Scene::getGpuTransformBufferSize() {
   return mGpuTransformBufferSize;
 }
 
+void Scene::acquireExternalTransformOwnership(void const *owner) {
+  if (!owner) {
+    throw std::runtime_error("external transform owner must not be null");
+  }
+  mExternalTransformOwners.insert(owner);
+}
+
+void Scene::releaseExternalTransformOwnership(void const *owner) {
+  mExternalTransformOwners.erase(owner);
+}
+
 void Scene::uploadObjectTransforms() {
   if (mTransformBufferRenderVersion == mRenderVersion) {
     return;

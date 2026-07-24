@@ -1087,8 +1087,13 @@ void Renderer::prepareRender(scene::Camera &camera) {
       recordRenderPasses();
     }
 
-    uploadGpuResources(camera);
-    mContext->getQueue().waitIdle();
+    if (mExecutionMode == RenderExecutionMode::eCpuManaged) {
+      // classic CPU flow: seed the freshly recorded resources immediately. In
+      // eGroupedGpu mode the owning group performs one explicit CPU snapshot at
+      // initialization; record-time uploads would overwrite GPU-owned buffers.
+      uploadGpuResources(camera);
+      mContext->getQueue().waitIdle();
+    }
   }
 
   mRequiresRecord = false;
@@ -1129,7 +1134,7 @@ void Renderer::uploadGpuResources(scene::Camera &camera) {
 
     // GPU interop can own object transforms while the normal upload path continues to refresh
     // segmentation, transparency, custom data, camera, scene, and light buffers.
-    if (!mExternalTransformUpdates) {
+    if (!mExternalTransformUpdates && !mScene->hasExternalTransformOwnership()) {
       mScene->uploadObjectTransforms();
     }
 
@@ -1220,7 +1225,7 @@ void Renderer::render(scene::Camera &camera, std::vector<vk::Semaphore> const &w
   SVULKAN2_PROFILE_BLOCK("Record & Submit");
   prepareRender(camera);
 
-  if (mAutoUpload) {
+  if (mExecutionMode == RenderExecutionMode::eCpuManaged) {
     uploadGpuResources(camera);
   }
 
@@ -1244,7 +1249,7 @@ void Renderer::render(
   SVULKAN2_PROFILE_BLOCK("Record & Submit");
   prepareRender(camera);
 
-  if (mAutoUpload) {
+  if (mExecutionMode == RenderExecutionMode::eCpuManaged) {
     uploadGpuResources(camera);
   }
 
@@ -1794,7 +1799,9 @@ core::Buffer &Renderer::getCameraBuffer() {
   return *mCameraBuffer;
 }
 
-void Renderer::setAutoUploadEnabled(bool enable) { mAutoUpload = enable; }
+void Renderer::prepareResources(scene::Camera &camera) { prepareRender(camera); }
+
+void Renderer::uploadCpuFrameState(scene::Camera &camera) { uploadGpuResources(camera); }
 
 } // namespace renderer
 } // namespace svulkan2

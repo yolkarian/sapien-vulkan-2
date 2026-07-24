@@ -6,6 +6,7 @@
 #include "svulkan2/core/as.h"
 #include "svulkan2/core/command_pool.h"
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
 namespace svulkan2 {
@@ -151,6 +152,12 @@ public:
   std::shared_ptr<core::Buffer> getObjectTransformBuffer();
   virtual void uploadObjectTransforms();
 
+  /** Keep CPU-managed renderers from uploading object transforms while one or
+   *  more grouped-GPU camera owners share this scene's transform resources. */
+  void acquireExternalTransformOwnership(void const *owner);
+  void releaseExternalTransformOwnership(void const *owner);
+  bool hasExternalTransformOwnership() const { return !mExternalTransformOwners.empty(); }
+
 protected:
   std::vector<std::unique_ptr<Node>> mNodes{};
   std::vector<std::unique_ptr<Object>> mObjects{};
@@ -167,6 +174,7 @@ protected:
   Node *mRootNode{nullptr};
 
   bool mRequireForceRemove{};
+  std::unordered_set<void const *> mExternalTransformOwners;
 
   // lighting
   glm::vec4 mAmbientLight{};

@@ -175,8 +175,8 @@ public:
 
   core::Buffer &getCameraBuffer();
 
-  void setAutoUploadEnabled(bool enable);
-  bool getAutoUploadEnabled() { return mAutoUpload; }
+  void prepareResources(scene::Camera &camera) override;
+  void uploadCpuFrameState(scene::Camera &camera) override;
 
   void setExternalTransformUpdatesEnabled(bool enable) { mExternalTransformUpdates = enable; }
   bool getExternalTransformUpdatesEnabled() const { return mExternalTransformUpdates; }
@@ -227,14 +227,13 @@ private:
   uint32_t mLineObjectIndex{};  // starting object index for line objects
   uint32_t mPointObjectIndex{}; // starting object index for point objects
 
-  bool mAutoUpload{true};
   bool mExternalTransformUpdates{false};
 
   // load and uplaod required resources
   void prepareRender(scene::Camera &camera);
 
-  // upload resources to gpu, when mAutoUpload is true, it is called immediately after
-  // prepareRender
+  // upload resources to gpu; called per frame by render() in eCpuManaged mode and
+  // once by uploadCpuFrameState() when a grouped renderer takes its CPU snapshot
   void uploadGpuResources(scene::Camera &camera);
 };
 

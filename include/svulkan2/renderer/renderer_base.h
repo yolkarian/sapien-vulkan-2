@@ -6,6 +6,14 @@
 namespace svulkan2 {
 namespace renderer {
 
+/** Steady-state execution mode of a renderer.
+ *  eCpuManaged: render() uploads the CPU-authored camera/scene/light/object frame
+ *  state before submitting (classic CPU rendering and the Viewer).
+ *  eGroupedGpu: transforms and camera buffers are owned by external (CUDA) writers;
+ *  render() only executes prepared commands and never uploads CPU frame state.
+ *  Entered once when a render group seals its cameras; not a per-frame toggle. */
+enum class RenderExecutionMode { eCpuManaged, eGroupedGpu };
+
 class RendererBase {
 public:
   static std::unique_ptr<RendererBase>
@@ -13,6 +21,16 @@ public:
 
   virtual void resize(int width, int height) = 0;
   virtual void setScene(std::shared_ptr<scene::Scene> scene) = 0;
+
+  /** create pipelines, render targets, buffers, and recorded commands without
+   *  submitting a render */
+  virtual void prepareResources(scene::Camera &camera) = 0;
+  /** upload the CPU-authored camera/scene/light/object frame state once;
+   *  requires prepared resources */
+  virtual void uploadCpuFrameState(scene::Camera &camera) = 0;
+
+  void setExecutionMode(RenderExecutionMode mode) { mExecutionMode = mode; }
+  RenderExecutionMode getExecutionMode() const { return mExecutionMode; }
 
   virtual void render(scene::Camera &camera,
                       std::vector<vk::Semaphore> const &waitSemaphores,
@@ -103,6 +121,9 @@ public:
   }
 
   virtual ~RendererBase() = default;
+
+protected:
+  RenderExecutionMode mExecutionMode{RenderExecutionMode::eCpuManaged};
 };
 
 } // namespace renderer
